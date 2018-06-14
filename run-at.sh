@@ -9,7 +9,7 @@
 #   $2 = command or script to be run, quoted if it has spaces
 
 
-### Set help variables ####################################################
+### Set main variables ####################################################
 
 usage='usage: run-at.sh [-b] [-h] [-k pid] [-l] [time] [command]'
 help_text="$usage
@@ -21,35 +21,42 @@ differences.
 By default, this script will run in the foreground and show a countdown timer,
 but it can be run as a background process by passing the \"-b\" option.
 
-    -b          run countdown and scheduled script in background, then exit
+    -b          Run countdown and scheduled script in background, then exit.
                 The following info will be returned:
                 <pid> <run-at path> <scheduled time> <command to be run>
 
-    -h          display this help and exit
+    -h          Display this help and exit.
 
-    -k <pid>    kill scheduled command with given pid and exit
+    -k <pid>    Kill scheduled command with given pid and exit.
 
-    -l          list all currently scheduled commands and exit
+    -l          List all currently scheduled commands and exit.
                 Commands will be shown with the following structure:
                 <pid> <run-at path> <scheduled time> <command to be run>
 
 If <scheduled time> and <command to be run> are not given, the user will be
 prompted for them. If <scheduled time> has any spaces, it must be quoted.
+If <command to be run> includes pipes, it needs to be double quoted. It's
+probably best to double-quote it anyway.
 "
 
+### Default variables ####################################################
+
+# Capture path to script for rerunning in background if requested.
+script_path=$(realpath $0)
+
+# Set default option for visibility of output.
+show=1
 
 ### Functions #############################################################
 
-# Get run time from user
+# Get run time from user.
 get_run_time_input ()
     {
     echo "Enter desired run time:"
     read -p "> " run_time
-    prepare_input "$run_time"
-    run_time="$prepared"
     }
 
-# Get command from user
+# Get command from user.
 get_command_input ()
     {
     echo "Enter command or script to run:"
@@ -60,18 +67,7 @@ get_command_input ()
     echo
     }
 
-# Enure that quotes in input are preserved
-prepare_input ()
-    {
-    input="$@"
-    prepared=
-    for i in "$@"; do
-        add="\"$i\""
-        prepared+="$add "
-    done
-    }
-
-# Find all running instances of run-at.sh & their pids
+# Find all running instances of run-at.sh & their pids.
 get_run_at_processes ()
     {
     run_at_processes=$(top -bc -n1 -w200 | grep 'run-at' | grep -v 'grep' \
@@ -79,55 +75,40 @@ get_run_at_processes ()
     run_at_pids=$(echo "$run_at_processes" | sed -r 's@^([0-9]*)\s.*$@\1@')
     }
 
-# Get the current time
+# Get the current time.
 get_now ()
     {
     now_secs=$(date +%s)
     now_readable=$(date -d @${run_secs} +%T)
     }
 
-# Calculate time remaining
+# Calculate time remaining.
 get_countdown_to ()
     {
     get_now
-    remaining=$(($1-$now_secs))
+    remaining=$(($1 - $now_secs))
     countdown=$(date -u -d @${remaining} +%T)
     }
 
-# Display time remaining until it equals zero
+# Display time remaining until it equals zero.
 wait_until ()
     {
-    while [[ $now_secs < $1 ]]; do
-        echo -en "\r$countdown until execution..."
+    while [[ $now_secs < $2 ]]; do
+        if [[ $1 == 1 ]]; then
+            echo -en "\r$countdown until execution..."
+        fi
         sleep 0.99s
-        get_countdown_to $1
+        get_countdown_to $2
     done
-    echo -en "\r\033[K"
-    }
-
-# Run the countdown sequence, then the given command
-run_countdown_and_command ()
-    {
-    echo \'"$to_run"\'" will run at $run_readable"
-
-    get_countdown_to $run_secs
-    wait_until $run_secs
-
-    get_now
-    echo "Started at $now_readable"
-    echo
-
-    # Run the command
-    eval "$to_run"
+    if [[ $1 == 1 ]]; then
+        echo -en "\r\033[K"
+    fi
     }
 
 
 ### Main execution ########################################################
 
-# Set default option for visibility
-show=1
-
-# Check for option passed
+# Check for option passed.
 while getopts ":bhk:l" opt; do
     case $opt in
         b) # runs script in background
@@ -162,38 +143,75 @@ while getopts ":bhk:l" opt; do
 done
 shift $(($OPTIND - 1))
 
-# Set command or script to run and the run time
+# Set command or script to run and the run time.
 if [[ $# < 1 ]]; then
-    # no time or command were given as args
+    # No time or command were given as args.
     get_run_time_input
     get_command_input
 elif [[ $# < 2 ]]; then
-    # assume time is given, but not command
-    prepare_input "$1"
-    run_time="$prepared"
+    # Assume time is given, but not command.
+    run_time="$1"
     get_command_input
 else
-    # assume time is given first & quoted if containing spaces
-    #   assume any remaining args belong to the command to be run
-    prepare_input "$1"
-    run_time="$prepared"
+    # Assume time is given first & quoted if containing spaces.
+    # Assume any remaining args belong to the command to be run.
+    run_time="$1"
     shift
-    prepare_input "$@"
-    to_run="$prepared"
+    to_run="$@"
 fi
 
-# Set input time in epoch secs & human-readable formats
-run_secs=$(eval date -d "$run_time" +%s)
-run_readable=$(date -d @${run_secs} +%T)
+# Set input time in epoch secs & human-readable formats.
+run_secs=$(date --date "$run_time" +%s)
 
-# If selected, restart script and run in background
-if [[ $show == 0 ]]; then
-    eval "$0 $run_time $to_run >/dev/null &"
-    bg_pid=$!
-    echo "$bg_pid $0 $run_time $to_run"
-else
-    run_countdown_and_command
+# Adjust time to next day if necessary.
+get_now
+if [[ $now_secs > $run_secs ]]; then
+    # Assume run time refers to the next day.
+    run_secs=$((run_secs + 86400))
 fi
 
+run_readable=$(date --date @${run_secs} +%T)
 
-exit 0
+# Set output file for background output.
+output_log="$HOME/run-at-$run_readable-stdout.log"
+
+# Find out if current script is in foreground or background.
+case $(ps -o stat= -p $$) in
+    *+*) # currently running in foreground
+        bg=0
+        ;;
+    *) # currently running in background
+        bg=1
+        show=0
+        ;;
+esac
+
+# Rerun script in background if requested.
+if [[ $bg == 0 ]]; then
+    if [[ $show == 0 ]]; then
+        # -b option was passed, rerun script in background & exit this script.
+        bash "$script_path" "$run_time" "$to_run" ">" "$output_log" "2>&1" &
+        bg_pid=$!
+        echo "$bg_pid $0 $run_time $to_run"
+        exit 0
+    fi
+fi
+
+# Announce run time if running in foreground.
+if [[ $show == 1 ]]; then
+    echo \'"$to_run"\'" will run at $run_readable"
+fi
+
+# Commence countdown to run time.
+get_countdown_to $run_secs
+wait_until "$show" "$run_secs"
+get_now
+
+# Announce start of scheduled command if running in foreground.
+if [[ $show == 1 ]]; then
+    echo -e "Started at $now_readable\n"
+fi
+
+# Run the scheduled command.
+eval "$to_run"
+exit $?
