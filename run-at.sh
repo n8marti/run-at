@@ -36,8 +36,8 @@ but it can be run as a background process by passing the \"-b\" option.
 If <scheduled time> and <command to be run> are not given, the user will be
 prompted for them.
 
-Any values valid for $ date --date can be used for
-<scheduled time>. If <scheduled time> has any spaces, it must be quoted.
+Any values valid for $ date --date can be used for <scheduled time>. If
+<scheduled time> has any spaces, it must be quoted.
 
 If <command to be run> includes pipes, it needs to be double quoted. It's
 probably best to double-quote it anyway.
