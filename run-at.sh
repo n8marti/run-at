@@ -124,11 +124,10 @@ while getopts ":bhk:l" opt; do
         k) # kill given run-at pid & exit
             pid=$OPTARG
             get_run_at_processes
-            if [[ $(echo "$run_at_pids" | grep "$pid") ]]
-                then
-                    kill -n 15 $pid
-                else
-                    echo "Error: \"$pid\" is not a valid run-at.sh pid"
+            if [[ $(echo "$run_at_pids" | grep "$pid") ]]; then
+                kill -n 15 $pid
+            else
+                echo "Error: \"$pid\" is not a valid run-at.sh pid"
             fi
             exit 0
             ;;
@@ -194,9 +193,9 @@ esac
 if [[ $bg == 0 ]]; then
     if [[ $show == 0 ]]; then
         # -b option was passed, rerun script in background & exit this script.
-        bash "$script_path" "$run_time" "$to_run" > "$output_log" 2>&1 &
+        bash "$script_path" "$run_time" "$to_run" &
         bg_pid=$!
-        echo "$bg_pid $0 $run_time $to_run"
+        echo "$bg_pid $0 $run_readable $to_run"
         exit 0
     fi
 fi
@@ -217,4 +216,8 @@ if [[ $show == 1 ]]; then
 fi
 
 # Run the scheduled command.
-exec $to_run
+if [[ $show == 0 ]]; then
+    exec $to_run > "$output_log" 2>&1
+else
+    exec $to_run
+fi
