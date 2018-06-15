@@ -16,7 +16,7 @@ help_text="$usage
 
 This script schedules a command or script to run at a later time. It is
 similar in some ways to the \"at\" command, but there are also some important
-differences.
+differences. It uses a bash shell, for example.
 
 By default, this script will run in the foreground and show a countdown timer,
 but it can be run as a background process by passing the \"-b\" option.
@@ -34,7 +34,11 @@ but it can be run as a background process by passing the \"-b\" option.
                 <pid> <run-at path> <scheduled time> <command to be run>
 
 If <scheduled time> and <command to be run> are not given, the user will be
-prompted for them. If <scheduled time> has any spaces, it must be quoted.
+prompted for them.
+
+Any values valid for $ date --date can be used for
+<scheduled time>. If <scheduled time> has any spaces, it must be quoted.
+
 If <command to be run> includes pipes, it needs to be double quoted. It's
 probably best to double-quote it anyway.
 "
