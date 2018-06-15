@@ -171,9 +171,10 @@ if [[ $now_secs > $run_secs ]]; then
 fi
 
 run_readable=$(date --date @${run_secs} +%T)
+run_filesafe=$(echo "$run_readable" | tr ':' '-')
 
 # Set output file for background output.
-output_log="$HOME/run-at-$run_readable-stdout.log"
+output_log="$HOME/run-at-$run_filesafe.log"
 
 # Find out if current script is in foreground or background.
 case $(ps -o stat= -p $$) in
@@ -190,7 +191,7 @@ esac
 if [[ $bg == 0 ]]; then
     if [[ $show == 0 ]]; then
         # -b option was passed, rerun script in background & exit this script.
-        bash "$script_path" "$run_time" "$to_run" ">" "$output_log" "2>&1" &
+        bash "$script_path" "$run_time" "$to_run" > "$output_log" 2>&1 &
         bg_pid=$!
         echo "$bg_pid $0 $run_time $to_run"
         exit 0
@@ -213,5 +214,4 @@ if [[ $show == 1 ]]; then
 fi
 
 # Run the scheduled command.
-eval "$to_run"
-exit $?
+exec $to_run
