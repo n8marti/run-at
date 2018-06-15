@@ -74,9 +74,8 @@ get_command_input ()
 # Find all running instances of run-at.sh & their pids.
 get_run_at_processes ()
     {
-    run_at_processes=$(top -bc -n1 -w200 | grep 'run-at' | grep -v 'grep' \
-        | head -n-2 | sed -r 's@^\s(.*)$@\1@' | cut -d' ' -f1,31-)
-    run_at_pids=$(echo "$run_at_processes" | sed -r 's@^([0-9]*)\s.*$@\1@')
+    run_at_processes=$(pgrep --list-full --full 'run-at' | head -n-2)
+    run_at_pids=$(pgrep --full 'run-at' | head -n-2)
     }
 
 # Get the current time.
